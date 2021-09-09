@@ -3,7 +3,7 @@
 [![Go.Dev reference](https://img.shields.io/badge/go.dev-reference-blue?logo=go)](https://pkg.go.dev/github.com/prashanthpai/asyncsqs?tab=doc)
 [![Build, Unit Tests, Linters Status](https://github.com/prashanthpai/asyncsqs/actions/workflows/test.yml/badge.svg?branch=master)](https://github.com/prashanthpai/asyncsqs/actions/workflows/test.yml)
 [![codecov](https://codecov.io/gh/prashanthpai/asyncsqs/branch/master/graph/badge.svg)](https://codecov.io/gh/prashanthpai/asyncsqs)
-[![Go Report Card](https://goreportcard.com/badge/github.com/prashanthpai/asyncsqs?clear_cache=1)](https://goreportcard.com/report/github.com/prashanthpai/asyncsqs)
+[![Go Report Card](https://goreportcard.com/badge/github.com/prashanthpai/asyncsqs?clear_cache=2)](https://goreportcard.com/report/github.com/prashanthpai/asyncsqs)
 [![MIT license](https://img.shields.io/badge/license-MIT-brightgreen.svg)](https://opensource.org/licenses/MIT)
 
 asyncsqs wraps around [SQS client](https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/sqs#Client)
