@@ -43,7 +43,7 @@ func TestNew(t *testing.T) {
 	assert.NotNil(c.DeleteMessageAsync())
 }
 
-func TestSendBatchNoWaitTime(t *testing.T) {
+func TestAsyncBatchNoWaitTime(t *testing.T) {
 	testNums := []int{1, 9, 10, 11, 99, 100, 101, 109}
 	for _, tc := range testNums {
 		tc := tc // capture range variable
