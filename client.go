@@ -104,9 +104,14 @@ func NewBufferedClient(config *Config) (*BufferedClient, error) {
 // pending requests in buffer are gracefully drained. Stop should be called
 // only after calls to SendMessageAsync() and DeleteMessageAsync() have stopped.
 func (c *BufferedClient) Stop() {
+	if c.stopped {
+		return
+	}
 	c.stopped = true
+
 	close(c.sendQueue)
 	close(c.deleteQueue)
+
 	c.batchers.Wait()
 }
 
