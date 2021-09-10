@@ -50,9 +50,12 @@ type Config struct {
 	// This is a required field.
 	QueueURL string
 
+	// Following fields are optional.
+
 	// SendWaitTime specifies a time limit for how long the client will
 	// wait before it will dispatch accumulated send message requests
-	// even if the batch isn't full.
+	// even if the batch isn't full. If not specified, send message
+	// requests will be dispatched only when a batch is full.
 	SendWaitTime time.Duration
 
 	// SendBufferSize specifies a limit on the number of send message
@@ -63,13 +66,14 @@ type Config struct {
 	SendBufferSize int
 
 	// OnSendMessageBatch will be called with results returned by SqsClient
-	// for a send message batch operation. This callback function needs to be
-	// go-routine safe.
+	// for a send message batch operation. If set, this callback function
+	// needs to be goroutine safe.
 	OnSendMessageBatch func(*sqs.SendMessageBatchOutput, error)
 
 	// DeleteWaitTime specifies a time limit for how long the client will
 	// wait before it will dispatch accumulated delete message requests
-	// even if the batch isn't full.
+	// even if the batch isn't full. If not specified, delete message
+	// requests will be dispatched only when a batch is full.
 	DeleteWaitTime time.Duration
 
 	// DeleteBufferSize specifies a limit on the number of delete message
@@ -80,8 +84,8 @@ type Config struct {
 	DeleteBufferSize int
 
 	// OnDeleteMessageBatch will be called with results returned by SqsClient
-	// for a delete message batch operation. This callback function needs to be
-	// go-routine safe.
+	// for a delete message batch operation. If set, this callback function
+	// needs to be goroutine safe.
 	OnDeleteMessageBatch func(*sqs.DeleteMessageBatchOutput, error)
 }
 
@@ -94,8 +98,9 @@ type BufferedClient struct {
 	stopped     bool
 }
 
-// NewBufferedClient creates and returns a new instance of BufferedClient.
-// Stop() must be eventually called to free resources created by NewBufferedClient.
+// NewBufferedClient creates and returns a new instance of BufferedClient. You
+// will need one BufferedClient client per SQS queue. Stop() must be eventually
+// called to free resources created by NewBufferedClient.
 func NewBufferedClient(config *Config) (*BufferedClient, error) {
 	if config == nil {
 		return nil, fmt.Errorf("config cannot be nil")

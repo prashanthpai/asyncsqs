@@ -11,10 +11,10 @@ from [aws-sdk-go-v2](https://github.com/aws/aws-sdk-go-v2) to provide an async
 buffered client which batches send message and delete message requests to
 **optimise AWS costs**.
 
-Messages can be scheduled to be sent or deleted. Requests will be dispatched
-when either
+Messages can be scheduled to be sent and deleted. Requests will be dispatched
+when
 
-* batch becomes full
+* either batch becomes full
 * or waiting period exhausts (if configured)
 
 ...**whichever occurs earlier**.
@@ -35,7 +35,7 @@ $ go mod init github.com/my/hellosqs
 And then add asyncsqs as a dependency to your existing or new project:
 
 ```sh
-go get github.com/prashanthpai/asyncsqs
+$ go get github.com/prashanthpai/asyncsqs
 ```
 
 ###### Write Code
