@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/prashanthpai/asyncsqs/mocks"
 
@@ -67,16 +68,14 @@ func TestAsyncBatchNoWaitTime(t *testing.T) {
 
 			// mock SQS calls
 			mockSqsClient := new(mocks.SqsClient)
-			for i := 0; i < numSqsCalls; i++ {
-				mockSqsClient.On("SendMessageBatch",
-					mock.AnythingOfType("*context.emptyCtx"),
-					mock.AnythingOfType("*sqs.SendMessageBatchInput")).
-					Return(nil, nil)
-				mockSqsClient.On("DeleteMessageBatch",
-					mock.AnythingOfType("*context.emptyCtx"),
-					mock.AnythingOfType("*sqs.DeleteMessageBatchInput")).
-					Return(nil, nil)
-			}
+			mockSqsClient.On("SendMessageBatch",
+				mock.AnythingOfType("*context.emptyCtx"), mock.AnythingOfType("*sqs.SendMessageBatchInput")).
+				Return(nil, nil).
+				Times(numSqsCalls)
+			mockSqsClient.On("DeleteMessageBatch",
+				mock.AnythingOfType("*context.emptyCtx"), mock.AnythingOfType("*sqs.DeleteMessageBatchInput")).
+				Return(nil, nil).
+				Times(numSqsCalls)
 
 			client, err := NewBufferedClient(&Config{
 				SqsClient: mockSqsClient,
@@ -119,7 +118,7 @@ func TestAsyncBatchNoWaitTime(t *testing.T) {
 				}
 			}()
 
-			wg.Wait() // all async calls have been accepted
+			wg.Wait() // wait for all async calls to be accepted
 
 			client.Stop() // stop client; test that draining of remaining requests work
 
@@ -131,6 +130,114 @@ func TestAsyncBatchNoWaitTime(t *testing.T) {
 
 			// assert SQS requests made
 			mockSqsClient.AssertExpectations(t)
+		})
+	}
+}
+
+func TestAsyncBatchWithWaitTime(t *testing.T) {
+	testNums := []int{1, 9, 10, 11, 31}
+	for _, tc := range testNums {
+		tc := tc // capture range variable
+		t.Run(strconv.Itoa(tc), func(t *testing.T) {
+			assert := require.New(t)
+
+			// messages to be sent or deleted - N each
+			numMsgs := tc
+			msgs := &sync.WaitGroup{}
+			msgs.Add(numMsgs * 2)
+
+			// how long do we wait until we ship the batch (even if its not full)
+			waitTime := 250 * time.Millisecond
+
+			// delay between successive calls to SendMessageAsync or DeleteMessageAsync
+			// should transate to roughly 5 or less in a batch but not more
+			delayBetweenAsyncCalls := 50 * time.Millisecond
+
+			// setup to record every batch size during dispatch
+			batchSizes := make([]int, 0, numMsgs)
+			batchMu := &sync.RWMutex{}
+			recordBatchSize := func(size int) {
+				batchMu.Lock()
+				batchSizes = append(batchSizes, size)
+				batchMu.Unlock()
+				for i := 0; i < size; i++ {
+					msgs.Done()
+				}
+			}
+
+			// mock SQS calls
+			mockSqsClient := new(mocks.SqsClient)
+			mockSqsClient.On("SendMessageBatch",
+				mock.AnythingOfType("*context.emptyCtx"),
+				mock.AnythingOfType("*sqs.SendMessageBatchInput")).
+				Return(nil, nil).
+				Maybe().                        // flexible no. of calls
+				Run(func(args mock.Arguments) { // hook to inspect and record batch size
+					recordBatchSize(len(args.Get(1).(*sqs.SendMessageBatchInput).Entries))
+				})
+			mockSqsClient.On("DeleteMessageBatch",
+				mock.AnythingOfType("*context.emptyCtx"),
+				mock.AnythingOfType("*sqs.DeleteMessageBatchInput")).
+				Return(nil, nil).
+				Maybe().                        // flexible no. of calls
+				Run(func(args mock.Arguments) { // hook to inspect and record batch size
+					recordBatchSize(len(args.Get(1).(*sqs.DeleteMessageBatchInput).Entries))
+				})
+
+			client, err := NewBufferedClient(&Config{
+				SqsClient:      mockSqsClient,
+				QueueURL:       "https://sqs.us-east-1.amazonaws.com/xxxxxxxxxxxx/some-queue",
+				SendWaitTime:   waitTime,
+				DeleteWaitTime: waitTime,
+			})
+			assert.NotNil(client)
+			assert.Nil(err)
+			defer client.Stop()
+
+			wg := &sync.WaitGroup{}
+
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for i := 0; i < numMsgs; i++ {
+					_ = client.SendMessageAsync(types.SendMessageBatchRequestEntry{
+						Id:          aws.String(strconv.Itoa(i)),
+						MessageBody: aws.String(strconv.Itoa(i)),
+					})
+					time.Sleep(delayBetweenAsyncCalls)
+				}
+			}()
+
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for i := 0; i < numMsgs; i++ {
+					_ = client.DeleteMessageAsync(types.DeleteMessageBatchRequestEntry{
+						Id: aws.String(strconv.Itoa(i)),
+					})
+					time.Sleep(delayBetweenAsyncCalls)
+				}
+			}()
+
+			wg.Wait() // wait for all async calls to be accepted
+
+			client.Stop() // stop client; test that draining of remaining requests work
+
+			msgs.Wait() // wait for all batches to be dispatched
+
+			// assert SQS requests made
+			mockSqsClient.AssertExpectations(t)
+
+			totalDispatched := 0
+			for _, bs := range batchSizes {
+				// assert that neither empty nor full batch is ever dispatched
+				assert.True(bs > 0 && bs < maxBatchSize)
+				// keep track of total calls made for later assertion
+				totalDispatched += bs
+			}
+
+			// assert that all requests made through - numMsgs for each of sends and deletes
+			assert.Equal(totalDispatched, 2*numMsgs)
 		})
 	}
 }

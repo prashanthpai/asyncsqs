@@ -18,12 +18,14 @@ const (
 )
 
 func main() {
+	// Create a SQS client with appropriate credentials/IAM role, region etc.
 	awsCfg, err := config.LoadDefaultConfig(context.Background())
 	if err != nil {
 		log.Fatalf("config.LoadDefaultConfig() failed: %v", err)
 	}
 	sqsClient := sqs.NewFromConfig(awsCfg)
 
+	// Create a asyncsqs buffered client; you'd have one per SQS queue
 	client, err := asyncsqs.NewBufferedClient(&asyncsqs.Config{
 		SqsClient:            sqsClient,
 		QueueURL:             queueURL,
@@ -33,6 +35,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("asyncsqs.NewBufferedClient() failed: %v", err)
 	}
+	// important! Stop() ensures that requests in memory are gracefully
+	// flushed/dispatched and resources like goroutines are cleaned-up
 	defer client.Stop()
 
 	for i := 0; i < 100; i++ {

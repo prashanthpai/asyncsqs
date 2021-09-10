@@ -41,15 +41,47 @@ type genericEntry struct {
 
 // Config is used to configure BufferedClient.
 type Config struct {
-	SqsClient SqsClient // required field
-	QueueURL  string    // required field
+	// SqsClient abstracts *sqs.Client from aws-sdk-go-v2. You can bring your
+	// own fully initialised SQS client (with required credentials, options
+	// etc). This is a required field.
+	SqsClient SqsClient
 
-	SendWaitTime       time.Duration
-	SendBufferSize     int
+	// QueueURL specifies AWS SQS Queue URL for a queue.
+	// This is a required field.
+	QueueURL string
+
+	// SendWaitTime specifies a time limit for how long the client will
+	// wait before it will dispatch accumulated send message requests
+	// even if the batch isn't full.
+	SendWaitTime time.Duration
+
+	// SendBufferSize specifies a limit on the number of send message
+	// requests that can be held in memory. If not specified, defaults
+	// to 1000. Internally, concurrency for send message requests will
+	// be set to SendBufferSize/10 which limits the number of concurrent
+	// send message SQS requests in progress.
+	SendBufferSize int
+
+	// OnSendMessageBatch will be called with results returned by SqsClient
+	// for a send message batch operation. This callback function needs to be
+	// go-routine safe.
 	OnSendMessageBatch func(*sqs.SendMessageBatchOutput, error)
 
-	DeleteWaitTime       time.Duration
-	DeleteBufferSize     int
+	// DeleteWaitTime specifies a time limit for how long the client will
+	// wait before it will dispatch accumulated delete message requests
+	// even if the batch isn't full.
+	DeleteWaitTime time.Duration
+
+	// DeleteBufferSize specifies a limit on the number of delete message
+	// requests that can be held in memory. If not specified, defaults
+	// to 1000. Internally, concurrency for delete message requests will
+	// be set to SendBufferSize/10 which limits the number of concurrent
+	// delete message SQS requests in progress.
+	DeleteBufferSize int
+
+	// OnDeleteMessageBatch will be called with results returned by SqsClient
+	// for a delete message batch operation. This callback function needs to be
+	// go-routine safe.
 	OnDeleteMessageBatch func(*sqs.DeleteMessageBatchOutput, error)
 }
 
@@ -115,7 +147,8 @@ func (c *BufferedClient) Stop() {
 	c.batchers.Wait()
 }
 
-// SendMessageAsync schedules message(s) to be sent.
+// SendMessageAsync schedules message(s) to be sent. It blocks if the send
+// buffer is full.
 func (c *BufferedClient) SendMessageAsync(entries ...types.SendMessageBatchRequestEntry) error {
 	if c.stopped {
 		return fmt.Errorf("client stopped")
@@ -130,7 +163,8 @@ func (c *BufferedClient) SendMessageAsync(entries ...types.SendMessageBatchReque
 	return nil
 }
 
-// DeleteMessageAsync schedules message(s) to be deleted.
+// DeleteMessageAsync schedules message(s) to be deleted. It blocks if the delete
+// buffer is full.
 func (c *BufferedClient) DeleteMessageAsync(entries ...types.DeleteMessageBatchRequestEntry) error {
 	if c.stopped {
 		return fmt.Errorf("client stopped")
@@ -166,8 +200,8 @@ func (c *BufferedClient) batcher(queue chan genericEntry, waitTime time.Duration
 	}
 
 	defer func() {
-		close(jobs)
-		dispatchers.Wait()
+		close(jobs)        // signal dispatchers to exit
+		dispatchers.Wait() // wait for dispatchers to end
 	}()
 
 	for {
@@ -178,7 +212,7 @@ func (c *BufferedClient) batcher(queue chan genericEntry, waitTime time.Duration
 			case entry, ok := <-queue:
 				if !ok {
 					// channel closed as Stop() was called
-					// drain whatever partial batch was accumulated
+					// drain the accumulated partial/full batch
 					if len(batch) > 0 {
 						jobs <- batch
 					}
@@ -191,7 +225,7 @@ func (c *BufferedClient) batcher(queue chan genericEntry, waitTime time.Duration
 				}
 			case <-ticker.C:
 				if len(batch) < 1 {
-					// time's up but nothing to send, continue to wait
+					// time's up but nothing to dispatch, continue to wait
 					continue
 				}
 			}
