@@ -6,8 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prashanthpai/asyncsqs/mocks"
-
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
@@ -18,11 +16,10 @@ import (
 func TestNew(t *testing.T) {
 	assert := require.New(t)
 
-	tcs := []*Config{
-		nil,
+	tcs := []Config{
 		{},
-		{SqsClient: new(mocks.SqsClient)},
-		{SqsClient: new(mocks.SqsClient), QueueURL: "invalid URL"},
+		{SQSClient: new(mockSQSClient)},
+		{SQSClient: new(mockSQSClient), QueueURL: "invalid URL"},
 	}
 
 	for _, tc := range tcs {
@@ -31,8 +28,8 @@ func TestNew(t *testing.T) {
 		}
 	}
 
-	c, err := NewBufferedClient(&Config{
-		SqsClient: new(mocks.SqsClient),
+	c, err := NewBufferedClient(Config{
+		SQSClient: new(mockSQSClient),
 		QueueURL:  "https://sqs.us-east-1.amazonaws.com/xxxxxxxxxxxx/some-queue",
 	})
 	assert.NotNil(c)
@@ -67,18 +64,18 @@ func TestAsyncBatchNoWaitTime(t *testing.T) {
 			delCbks.Add(numSqsCalls)
 
 			// mock SQS calls
-			mockSqsClient := new(mocks.SqsClient)
-			mockSqsClient.On("SendMessageBatch",
+			mockSQSClient := new(mockSQSClient)
+			mockSQSClient.On("SendMessageBatch",
 				mock.AnythingOfType("*context.emptyCtx"), mock.AnythingOfType("*sqs.SendMessageBatchInput")).
 				Return(nil, nil).
 				Times(numSqsCalls)
-			mockSqsClient.On("DeleteMessageBatch",
+			mockSQSClient.On("DeleteMessageBatch",
 				mock.AnythingOfType("*context.emptyCtx"), mock.AnythingOfType("*sqs.DeleteMessageBatchInput")).
 				Return(nil, nil).
 				Times(numSqsCalls)
 
-			client, err := NewBufferedClient(&Config{
-				SqsClient: mockSqsClient,
+			client, err := NewBufferedClient(Config{
+				SQSClient: mockSQSClient,
 				QueueURL:  "https://sqs.us-east-1.amazonaws.com/xxxxxxxxxxxx/some-queue",
 				OnSendMessageBatch: func(output *sqs.SendMessageBatchOutput, err error) {
 					assert.Nil(output)
@@ -129,7 +126,7 @@ func TestAsyncBatchNoWaitTime(t *testing.T) {
 			delCbks.Wait()
 
 			// assert SQS requests made
-			mockSqsClient.AssertExpectations(t)
+			mockSQSClient.AssertExpectations(t)
 		})
 	}
 }
@@ -166,8 +163,8 @@ func TestAsyncBatchWithWaitTime(t *testing.T) {
 			}
 
 			// mock SQS calls
-			mockSqsClient := new(mocks.SqsClient)
-			mockSqsClient.On("SendMessageBatch",
+			mockSQSClient := new(mockSQSClient)
+			mockSQSClient.On("SendMessageBatch",
 				mock.AnythingOfType("*context.emptyCtx"),
 				mock.AnythingOfType("*sqs.SendMessageBatchInput")).
 				Return(nil, nil).
@@ -175,7 +172,7 @@ func TestAsyncBatchWithWaitTime(t *testing.T) {
 				Run(func(args mock.Arguments) { // hook to inspect and record batch size
 					recordBatchSize(len(args.Get(1).(*sqs.SendMessageBatchInput).Entries))
 				})
-			mockSqsClient.On("DeleteMessageBatch",
+			mockSQSClient.On("DeleteMessageBatch",
 				mock.AnythingOfType("*context.emptyCtx"),
 				mock.AnythingOfType("*sqs.DeleteMessageBatchInput")).
 				Return(nil, nil).
@@ -184,8 +181,8 @@ func TestAsyncBatchWithWaitTime(t *testing.T) {
 					recordBatchSize(len(args.Get(1).(*sqs.DeleteMessageBatchInput).Entries))
 				})
 
-			client, err := NewBufferedClient(&Config{
-				SqsClient:      mockSqsClient,
+			client, err := NewBufferedClient(Config{
+				SQSClient:      mockSQSClient,
 				QueueURL:       "https://sqs.us-east-1.amazonaws.com/xxxxxxxxxxxx/some-queue",
 				SendWaitTime:   waitTime,
 				DeleteWaitTime: waitTime,
@@ -226,7 +223,7 @@ func TestAsyncBatchWithWaitTime(t *testing.T) {
 			msgs.Wait() // wait for all batches to be dispatched
 
 			// assert SQS requests made
-			mockSqsClient.AssertExpectations(t)
+			mockSQSClient.AssertExpectations(t)
 
 			totalDispatched := 0
 			for _, bs := range batchSizes {

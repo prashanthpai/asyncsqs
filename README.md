@@ -65,8 +65,8 @@ func main() {
 	sqsClient := sqs.NewFromConfig(awsCfg)
 
 	// Create a asyncsqs buffered client; you'd have one per SQS queue
-	client, err := asyncsqs.NewBufferedClient(&asyncsqs.Config{
-		SqsClient:          sqsClient,
+	client, err := asyncsqs.NewBufferedClient(asyncsqs.Config{
+		SQSClient:          sqsClient,
 		QueueURL:           "https://sqs.us-east-1.amazonaws.com/xxxxxxxxxxxx/qqqqqqqqqqqq",
 		OnSendMessageBatch: sendResponseHandler, // register callback function (recommended)
 	})

@@ -24,14 +24,11 @@ const (
 	opDelete sqsOp = iota
 )
 
-// SqsClient wraps *sqs.Client from aws-sdk-go-v2
-type SqsClient interface {
+// SQSClient wraps *sqs.Client from aws-sdk-go-v2
+type SQSClient interface {
 	SendMessageBatch(context.Context, *sqs.SendMessageBatchInput, ...func(*sqs.Options)) (*sqs.SendMessageBatchOutput, error)
 	DeleteMessageBatch(context.Context, *sqs.DeleteMessageBatchInput, ...func(*sqs.Options)) (*sqs.DeleteMessageBatchOutput, error)
 }
-
-// compile-time guard for AWS SDK API breakages.
-var _ SqsClient = sqs.New(sqs.Options{})
 
 // genericEntry for the lack of generics in Go.
 type genericEntry struct {
@@ -41,10 +38,10 @@ type genericEntry struct {
 
 // Config is used to configure BufferedClient.
 type Config struct {
-	// SqsClient abstracts *sqs.Client from aws-sdk-go-v2. You can bring your
+	// SQSClient abstracts *sqs.Client from aws-sdk-go-v2. You can bring your
 	// own fully initialised SQS client (with required credentials, options
 	// etc). This is a required field.
-	SqsClient SqsClient
+	SQSClient SQSClient
 
 	// QueueURL specifies AWS SQS Queue URL for a queue.
 	// This is a required field.
@@ -65,7 +62,7 @@ type Config struct {
 	// send message SQS requests in progress.
 	SendBufferSize int
 
-	// OnSendMessageBatch will be called with results returned by SqsClient
+	// OnSendMessageBatch will be called with results returned by SQSClient
 	// for a send message batch operation. If set, this callback function
 	// needs to be goroutine safe.
 	OnSendMessageBatch func(*sqs.SendMessageBatchOutput, error)
@@ -83,7 +80,7 @@ type Config struct {
 	// delete message SQS requests in progress.
 	DeleteBufferSize int
 
-	// OnDeleteMessageBatch will be called with results returned by SqsClient
+	// OnDeleteMessageBatch will be called with results returned by SQSClient
 	// for a delete message batch operation. If set, this callback function
 	// needs to be goroutine safe.
 	OnDeleteMessageBatch func(*sqs.DeleteMessageBatchOutput, error)
@@ -101,12 +98,8 @@ type BufferedClient struct {
 // NewBufferedClient creates and returns a new instance of BufferedClient. You
 // will need one BufferedClient client per SQS queue. Stop() must be eventually
 // called to free resources created by NewBufferedClient.
-func NewBufferedClient(config *Config) (*BufferedClient, error) {
-	if config == nil {
-		return nil, fmt.Errorf("config cannot be nil")
-	}
-
-	if config.SqsClient == nil {
+func NewBufferedClient(config Config) (*BufferedClient, error) {
+	if config.SQSClient == nil {
 		return nil, fmt.Errorf("config.Client cannot be nil")
 	}
 
@@ -115,7 +108,7 @@ func NewBufferedClient(config *Config) (*BufferedClient, error) {
 	}
 
 	c := &BufferedClient{
-		Config: *config,
+		Config: config,
 	}
 
 	if c.SendBufferSize <= 0 {
@@ -270,7 +263,7 @@ func (c *BufferedClient) dispatchBatch(batch []genericEntry, op sqsOp) {
 }
 
 func (c *BufferedClient) sendMessageBatch(entries []types.SendMessageBatchRequestEntry) {
-	resp, err := c.SqsClient.SendMessageBatch(context.TODO(), &sqs.SendMessageBatchInput{
+	resp, err := c.SQSClient.SendMessageBatch(context.TODO(), &sqs.SendMessageBatchInput{
 		Entries:  entries,
 		QueueUrl: aws.String(c.QueueURL),
 	})
@@ -281,7 +274,7 @@ func (c *BufferedClient) sendMessageBatch(entries []types.SendMessageBatchReques
 }
 
 func (c *BufferedClient) deleteMessageBatch(entries []types.DeleteMessageBatchRequestEntry) {
-	resp, err := c.SqsClient.DeleteMessageBatch(context.TODO(), &sqs.DeleteMessageBatchInput{
+	resp, err := c.SQSClient.DeleteMessageBatch(context.TODO(), &sqs.DeleteMessageBatchInput{
 		Entries:  entries,
 		QueueUrl: aws.String(c.QueueURL),
 	})
