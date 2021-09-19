@@ -58,9 +58,7 @@ type Config struct {
 
 	// SendBufferSize specifies a limit on the number of send message
 	// requests that can be held in memory. If not specified, defaults
-	// to 1000. Internally, concurrency for send message requests will
-	// be set to SendBufferSize/10 which limits the number of concurrent
-	// send message SQS requests in progress.
+	// to 1000.
 	SendBufferSize int
 
 	// SendConcurrency limits the number of concurrent send message SQS
@@ -80,9 +78,7 @@ type Config struct {
 
 	// DeleteBufferSize specifies a limit on the number of delete message
 	// requests that can be held in memory. If not specified, defaults
-	// to 1000. Internally, concurrency for delete message requests will
-	// be set to SendBufferSize/10 which limits the number of concurrent
-	// delete message SQS requests in progress.
+	// to 1000.
 	DeleteBufferSize int
 
 	// DeleteConcurrency limits the number of concurrent delete message SQS
