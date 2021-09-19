@@ -34,6 +34,13 @@ func TestNew(t *testing.T) {
 	})
 	assert.NotNil(c)
 	assert.Nil(err)
+
+	// check defaults
+	assert.Equal(c.SendBufferSize, defaultBufferSize)
+	assert.Equal(c.DeleteBufferSize, defaultBufferSize)
+	assert.Equal(c.SendConcurrency, c.SendBufferSize/maxBatchSize)
+	assert.Equal(c.DeleteConcurrency, c.DeleteBufferSize/maxBatchSize)
+
 	c.Stop()
 
 	// Async funcs should return error after stopping

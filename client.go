@@ -62,6 +62,10 @@ type Config struct {
 	// send message SQS requests in progress.
 	SendBufferSize int
 
+	// SendConcurrency limits the number of concurrent send message SQS
+	// requests in progress. If not specified, defaults to SendBufferSize/10.
+	SendConcurrency int
+
 	// OnSendMessageBatch will be called with results returned by SQSClient
 	// for a send message batch operation. If set, this callback function
 	// needs to be goroutine safe.
@@ -79,6 +83,10 @@ type Config struct {
 	// be set to SendBufferSize/10 which limits the number of concurrent
 	// delete message SQS requests in progress.
 	DeleteBufferSize int
+
+	// DeleteConcurrency limits the number of concurrent delete message SQS
+	// requests in progress. If not specified, defaults to DeleteBufferSize/10.
+	DeleteConcurrency int
 
 	// OnDeleteMessageBatch will be called with results returned by SQSClient
 	// for a delete message batch operation. If set, this callback function
@@ -121,11 +129,17 @@ func NewBufferedClient(config Config) (*BufferedClient, error) {
 	}
 	c.deleteQueue = make(chan genericEntry, c.DeleteBufferSize)
 
+	if c.SendConcurrency < 1 {
+		c.SendConcurrency = c.SendBufferSize / maxBatchSize
+	}
 	c.batchers.Add(1)
-	go c.batcher(c.sendQueue, c.SendWaitTime, c.SendBufferSize/maxBatchSize, opSend, &c.batchers)
+	go c.batcher(c.sendQueue, c.SendWaitTime, c.SendConcurrency, opSend, &c.batchers)
 
+	if c.DeleteConcurrency < 1 {
+		c.DeleteConcurrency = c.DeleteBufferSize / maxBatchSize
+	}
 	c.batchers.Add(1)
-	go c.batcher(c.deleteQueue, c.DeleteWaitTime, c.DeleteBufferSize/maxBatchSize, opDelete, &c.batchers)
+	go c.batcher(c.deleteQueue, c.DeleteWaitTime, c.DeleteConcurrency, opDelete, &c.batchers)
 
 	return c, nil
 }

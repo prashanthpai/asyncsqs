@@ -112,6 +112,5 @@ This translates to an average payload limit of around 25KB per individual messag
 
 ### TODO
 
-* Expose concurrency/pool size as a configurable option.
 * Expose some metrics/stats via an API or expvar.
 * Validate payload size and perform batching adhering to SQS payload limits.
