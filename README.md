@@ -109,7 +109,3 @@ on batch request payload:
     256 KB (262,144 bytes).
 
 This translates to an average payload limit of around 25KB per individual message.
-
-### TODO
-
-* Validate payload size and perform batching adhering to SQS payload limits.
