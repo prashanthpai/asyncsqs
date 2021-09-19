@@ -134,6 +134,13 @@ func TestAsyncBatchNoWaitTime(t *testing.T) {
 
 			// assert SQS requests made
 			mockSQSClient.AssertExpectations(t)
+
+			// assert stats
+			s := client.Stats()
+			assert.Equal(s.MessagesSent, uint64(numMsgs))
+			assert.Equal(s.MessagesDeleted, uint64(numMsgs))
+			assert.Equal(s.SendMessageBatchCalls, uint64(numSqsCalls))
+			assert.Equal(s.DeleteMessageBatchCalls, uint64(numSqsCalls))
 		})
 	}
 }
@@ -242,6 +249,12 @@ func TestAsyncBatchWithWaitTime(t *testing.T) {
 
 			// assert that all requests made through - numMsgs for each of sends and deletes
 			assert.Equal(totalDispatched, 2*numMsgs)
+
+			// assert stats
+			s := client.Stats()
+			assert.Equal(s.MessagesSent, uint64(numMsgs))
+			assert.Equal(s.MessagesDeleted, uint64(numMsgs))
+			assert.Equal(s.SendMessageBatchCalls+s.DeleteMessageBatchCalls, uint64(len(batchSizes)))
 		})
 	}
 }

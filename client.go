@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -94,6 +95,14 @@ type Config struct {
 	OnDeleteMessageBatch func(*sqs.DeleteMessageBatchOutput, error)
 }
 
+// Stats contains client statistics.
+type Stats struct {
+	MessagesSent            uint64
+	MessagesDeleted         uint64
+	SendMessageBatchCalls   uint64
+	DeleteMessageBatchCalls uint64
+}
+
 // BufferedClient wraps aws-sdk-go-v2's sqs.Client to provide a async buffered client.
 type BufferedClient struct {
 	Config
@@ -101,6 +110,7 @@ type BufferedClient struct {
 	deleteQueue chan genericEntry
 	batchers    sync.WaitGroup
 	stopped     bool
+	stats       Stats
 }
 
 // NewBufferedClient creates and returns a new instance of BufferedClient. You
@@ -157,6 +167,17 @@ func (c *BufferedClient) Stop() {
 	close(c.deleteQueue)
 
 	c.batchers.Wait()
+}
+
+// Stats returns client statistics.
+func (c *BufferedClient) Stats() Stats {
+	s := Stats{
+		MessagesSent:            atomic.LoadUint64(&c.stats.MessagesSent),
+		MessagesDeleted:         atomic.LoadUint64(&c.stats.MessagesDeleted),
+		SendMessageBatchCalls:   atomic.LoadUint64(&c.stats.SendMessageBatchCalls),
+		DeleteMessageBatchCalls: atomic.LoadUint64(&c.stats.DeleteMessageBatchCalls),
+	}
+	return s
 }
 
 // SendMessageAsync schedules message(s) to be sent. It blocks if the send
@@ -281,6 +302,8 @@ func (c *BufferedClient) sendMessageBatch(entries []types.SendMessageBatchReques
 		Entries:  entries,
 		QueueUrl: aws.String(c.QueueURL),
 	})
+	atomic.AddUint64(&c.stats.SendMessageBatchCalls, 1)
+	atomic.AddUint64(&c.stats.MessagesSent, uint64(len(entries)))
 
 	if c.OnSendMessageBatch != nil {
 		c.OnSendMessageBatch(resp, err)
@@ -292,6 +315,8 @@ func (c *BufferedClient) deleteMessageBatch(entries []types.DeleteMessageBatchRe
 		Entries:  entries,
 		QueueUrl: aws.String(c.QueueURL),
 	})
+	atomic.AddUint64(&c.stats.DeleteMessageBatchCalls, 1)
+	atomic.AddUint64(&c.stats.MessagesDeleted, uint64(len(entries)))
 
 	if c.OnDeleteMessageBatch != nil {
 		c.OnDeleteMessageBatch(resp, err)
