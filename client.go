@@ -16,6 +16,7 @@ import (
 const (
 	defaultBufferSize = 1000
 	maxBatchSize      = 10
+	maxPayloadBytes   = 262144
 )
 
 type sqsOp int
@@ -181,6 +182,12 @@ func (c *BufferedClient) Stats() Stats {
 func (c *BufferedClient) SendMessageAsync(entries ...types.SendMessageBatchRequestEntry) error {
 	if c.stopped {
 		return fmt.Errorf("client stopped")
+	}
+
+	for _, entry := range entries {
+		if len(*entry.MessageBody) > maxPayloadBytes/maxBatchSize {
+			return fmt.Errorf("individual message size cannot exceed %d bytes", maxPayloadBytes/maxBatchSize)
+		}
 	}
 
 	for _, entry := range entries {

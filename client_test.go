@@ -1,6 +1,7 @@
 package asyncsqs
 
 import (
+	"math/rand"
 	"strconv"
 	"sync"
 	"testing"
@@ -12,6 +13,16 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
+
+var letters = []rune("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
+func randString(n int) string {
+	r := make([]rune, n)
+	for i := range r {
+		r[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(r)
+}
 
 func TestNew(t *testing.T) {
 	assert := require.New(t)
@@ -34,16 +45,34 @@ func TestNew(t *testing.T) {
 	})
 	assert.NotNil(c)
 	assert.Nil(err)
+	defer c.Stop()
 
 	// check defaults
 	assert.Equal(c.SendBufferSize, defaultBufferSize)
 	assert.Equal(c.DeleteBufferSize, defaultBufferSize)
 	assert.Equal(c.SendConcurrency, c.SendBufferSize/maxBatchSize)
 	assert.Equal(c.DeleteConcurrency, c.DeleteBufferSize/maxBatchSize)
+}
 
-	c.Stop()
+func TestError(t *testing.T) {
+	assert := require.New(t)
+
+	c, err := NewBufferedClient(Config{
+		SQSClient: new(mockSQSClient),
+		QueueURL:  "https://sqs.us-east-1.amazonaws.com/xxxxxxxxxxxx/some-queue",
+	})
+	assert.NotNil(c)
+	assert.Nil(err)
+
+	// Check validation of payload size
+	sizeExceedingLimit := (maxPayloadBytes / maxBatchSize) + 1
+	assert.NotNil(c.SendMessageAsync(types.SendMessageBatchRequestEntry{
+		Id:          aws.String("some id"),
+		MessageBody: aws.String(randString(sizeExceedingLimit)),
+	}))
 
 	// Async funcs should return error after stopping
+	c.Stop()
 	assert.NotNil(c.SendMessageAsync())
 	assert.NotNil(c.DeleteMessageAsync())
 }
