@@ -102,11 +102,11 @@ func TestAsyncBatchNoWaitTime(t *testing.T) {
 			// mock SQS calls
 			mockSQSClient := new(mockSQSClient)
 			mockSQSClient.On("SendMessageBatch",
-				mock.AnythingOfType("*context.emptyCtx"), mock.AnythingOfType("*sqs.SendMessageBatchInput")).
+				mock.AnythingOfType("todoCtx"), mock.AnythingOfType("*sqs.SendMessageBatchInput")).
 				Return(nil, nil).
 				Times(numSqsCalls)
 			mockSQSClient.On("DeleteMessageBatch",
-				mock.AnythingOfType("*context.emptyCtx"), mock.AnythingOfType("*sqs.DeleteMessageBatchInput")).
+				mock.AnythingOfType("todoCtx"), mock.AnythingOfType("*sqs.DeleteMessageBatchInput")).
 				Return(nil, nil).
 				Times(numSqsCalls)
 
@@ -208,7 +208,7 @@ func TestAsyncBatchWithWaitTime(t *testing.T) {
 			// mock SQS calls
 			mockSQSClient := new(mockSQSClient)
 			mockSQSClient.On("SendMessageBatch",
-				mock.AnythingOfType("*context.emptyCtx"),
+				mock.AnythingOfType("todoCtx"),
 				mock.AnythingOfType("*sqs.SendMessageBatchInput")).
 				Return(nil, nil).
 				Maybe().                        // flexible no. of calls
@@ -216,7 +216,7 @@ func TestAsyncBatchWithWaitTime(t *testing.T) {
 					recordBatchSize(len(args.Get(1).(*sqs.SendMessageBatchInput).Entries))
 				})
 			mockSQSClient.On("DeleteMessageBatch",
-				mock.AnythingOfType("*context.emptyCtx"),
+				mock.AnythingOfType("todoCtx"),
 				mock.AnythingOfType("*sqs.DeleteMessageBatchInput")).
 				Return(nil, nil).
 				Maybe().                        // flexible no. of calls
