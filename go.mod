@@ -1,6 +1,6 @@
 module github.com/prashanthpai/asyncsqs
 
-go 1.17
+go 1.25.11
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.9.0
